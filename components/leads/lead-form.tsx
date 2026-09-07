@@ -1,0 +1,35 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { LoaderCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
+import { z } from "zod";
+import { createLeadAction } from "@/app/actions/crm";
+import { Button, Field, inputClass, selectClass, textareaClass } from "@/components/ui/primitives";
+import type { Contact, Profile } from "@/lib/types";
+import { leadSchema } from "@/lib/validation";
+import { titleCase } from "@/lib/utils";
+
+type LeadInput = z.infer<typeof leadSchema>;
+const stages = ["new", "contacted", "qualified", "site_visit", "quotation", "negotiation", "won", "lost"] as const;
+
+export function LeadForm({ profiles, contacts, currentUserId, initialContactId }: { profiles: Profile[]; contacts: Contact[]; currentUserId: string; initialContactId?: string }) {
+  const router = useRouter();
+  const initialContact = contacts.find((item) => item.id === initialContactId);
+  const { register, handleSubmit, setValue, formState: { errors, isSubmitting } } = useForm<LeadInput>({ resolver: zodResolver(leadSchema), defaultValues: { contact_id: initialContact?.id ?? "", full_name: initialContact?.full_name ?? "", phone: initialContact?.phone ?? "", whatsapp_number: initialContact?.whatsapp_number ?? "", contact_email: initialContact?.email ?? "", organization_name: initialContact?.organization_name ?? "", source: "manual", receiving_whatsapp_number: "", campaign_source: "", customer_need: "", location_text: initialContact?.location_text ?? "", status: "new", priority: "medium", assigned_to: currentUserId, received_at: new Date().toISOString().slice(0, 16), last_contacted_at: "", next_follow_up_at: "", notes: "", original_message: "" } });
+  const contactField = register("contact_id");
+  const onSubmit = handleSubmit(async (values) => { const result = await createLeadAction(values); if (!result.ok) { toast.error(result.message); return; } toast.success(result.message); router.push(`/leads/${result.slug ?? result.id}`); router.refresh(); });
+  const chooseContact = (id: string) => {
+    const contact = contacts.find((item) => item.id === id);
+    if (!contact) return;
+    setValue("full_name", contact.full_name); setValue("phone", contact.phone); setValue("whatsapp_number", contact.whatsapp_number ?? ""); setValue("contact_email", contact.email ?? ""); setValue("organization_name", contact.organization_name ?? ""); setValue("location_text", contact.location_text ?? "");
+  };
+
+  return <form onSubmit={onSubmit} className="space-y-7">
+    <section><div className="mb-4"><h3 className="text-sm font-semibold text-[#2e3931]">Contact</h3><p className="mt-1 text-[11px] text-[#879088]">Choose an existing person, or enter a phone number. The CRM will reuse any contact with the same normalized phone.</p></div><div className="grid gap-5 sm:grid-cols-2"><Field label="Existing contact"><select {...contactField} onChange={(event) => { contactField.onChange(event); chooseContact(event.target.value); }} className={selectClass}><option value="">New contact / match by phone</option>{contacts.map((contact) => <option key={contact.id} value={contact.id}>{contact.full_name} · {contact.phone}</option>)}</select></Field><Field label="Full name"><input {...register("full_name")} className={inputClass} placeholder="Optional if the name is not known yet" /></Field><Field label="Phone number" error={errors.phone?.message}><input {...register("phone")} className={inputClass} placeholder="+961" inputMode="tel" /></Field><Field label="WhatsApp number"><input {...register("whatsapp_number")} className={inputClass} placeholder="Same as phone if applicable" inputMode="tel" /></Field><Field label="Email (optional)" error={errors.contact_email?.message}><input {...register("contact_email")} type="email" className={inputClass} /></Field><Field label="Organization / business (optional)"><input {...register("organization_name")} className={inputClass} /></Field></div></section>
+    <section className="border-t border-[#edf0ed] pt-6"><div className="mb-4"><h3 className="text-sm font-semibold text-[#2e3931]">Customer request</h3><p className="mt-1 text-[11px] text-[#879088]">This lead is the request that moves through WWT’s pipeline.</p></div><div className="grid gap-5 sm:grid-cols-2"><Field label="What the customer needs" error={errors.customer_need?.message}><input {...register("customer_need")} className={inputClass} placeholder="e.g. Wastewater treatment system" /></Field><Field label="Location"><input {...register("location_text")} className={inputClass} placeholder="City, area or site" /></Field><Field label="Source"><select {...register("source")} className={selectClass}>{["manual", "whatsapp", "meta_ad", "website", "phone", "email", "referral", "outbound", "tender", "social_media", "other"].map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></Field><Field label="Receiving WWT WhatsApp number"><input {...register("receiving_whatsapp_number")} className={inputClass} placeholder="Which WWT line received it?" inputMode="tel" /></Field><Field label="Campaign / ad source"><input {...register("campaign_source")} className={inputClass} placeholder="Optional campaign name or ad ID" /></Field><Field label="Assigned salesperson" error={errors.assigned_to?.message}><select {...register("assigned_to")} className={selectClass}>{profiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.full_name}</option>)}</select></Field><Field label="Stage"><select {...register("status")} className={selectClass}>{stages.map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></Field><Field label="Priority"><select {...register("priority")} className={selectClass}>{["low", "medium", "high", "urgent"].map((value) => <option key={value} value={value}>{titleCase(value)}</option>)}</select></Field><Field label="Date received" error={errors.received_at?.message}><input {...register("received_at")} type="datetime-local" className={inputClass} /></Field><Field label="Last contacted"><input {...register("last_contacted_at")} type="datetime-local" className={inputClass} /></Field><Field label="Next follow-up"><input {...register("next_follow_up_at")} type="datetime-local" className={inputClass} /></Field></div><div className="mt-5 grid gap-5 sm:grid-cols-2"><Field label="Internal notes"><textarea {...register("notes")} className={textareaClass} /></Field><Field label="Original message" hint="Stored unchanged for future WhatsApp ingestion."><textarea {...register("original_message")} className={textareaClass} placeholder="Paste the inbound message if available..." /></Field></div></section>
+    <div className="flex justify-end gap-2 border-t border-[#edf0ed] pt-5"><Button type="button" variant="secondary" onClick={() => router.back()}>Cancel</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? <LoaderCircle className="size-4 animate-spin" /> : null} Create lead</Button></div>
+  </form>;
+}
