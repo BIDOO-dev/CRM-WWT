@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 const baseMigration = readFileSync(resolve("supabase/migrations/20260907130000_phase1_crm.sql"), "utf8").toLowerCase();
 const refactorMigration = readFileSync(resolve("supabase/migrations/20260907170000_contact_lead_first_crm.sql"), "utf8").toLowerCase();
+const contactRlsFix = readFileSync(resolve("supabase/migrations/20260908014500_fix_contacts_insert_returning_rls.sql"), "utf8").toLowerCase();
 
 describe("contact + lead-first database architecture", () => {
   it.each(["profiles", "companies", "contacts", "leads", "opportunities", "tasks", "activities"])("keeps RLS enabled for %s", (table) => {
@@ -41,5 +42,12 @@ describe("contact + lead-first database architecture", () => {
 
   it("keeps contact-first views under invoker security", () => {
     expect(refactorMigration.match(/security_invoker = true/g)?.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("allows contact insert-returning to evaluate ownership from the candidate row", () => {
+    expect(contactRlsFix).toContain("created_by = (select auth.uid())");
+    expect(contactRlsFix).toContain("public.can_view_owner(owner_id)");
+    expect(contactRlsFix).toContain("from public.leads l");
+    expect(contactRlsFix).not.toContain("public.can_view_contact(id)");
   });
 });
