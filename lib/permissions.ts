@@ -11,3 +11,15 @@ export function canDeleteLeads(role: UserRole) {
 export function canViewAllRecords(role: UserRole) {
   return role === "admin" || role === "sales_manager";
 }
+
+export function canApproveQuotations(role: UserRole) {
+  return role === "admin" || role === "sales_manager";
+}
+
+export function canImportHistoricalLeads(role: UserRole) {
+  return role === "admin" || role === "sales_manager";
+}
+
+export function canManageTeam(role: UserRole) {
+  return role === "admin";
+}

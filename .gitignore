@@ -41,6 +41,10 @@ yarn-error.log*
 /.codex/
 /.tools/
 /supabase/.temp/
+/.tmp/
+
+# WWT source workbooks contain customer PII and must never enter Git history
+/Recyco WWT Leads Mastersheet*.xlsx
 
 # typescript
 *.tsbuildinfo

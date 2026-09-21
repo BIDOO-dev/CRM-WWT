@@ -5,14 +5,14 @@ import { getDashboardMetrics } from "@/lib/crm-filters";
 import type { Activity, CrmTask, Lead } from "@/lib/types";
 import { initials, titleCase } from "@/lib/utils";
 
-type DashboardData = { leads: Lead[]; tasks: CrmTask[]; activities: Activity[] };
+type DashboardData = { leads: Lead[]; tasks: CrmTask[]; activities: Activity[]; siteVisitCount: number; quotationCount: number };
 
 const stageMeta = [
   { id: "new", label: "New", color: "#b9d8bc" }, { id: "contacted", label: "Contacted", color: "#9fbda2" }, { id: "qualified", label: "Qualified", color: "#82a886" }, { id: "site_visit", label: "Site visit", color: "#69a06d" }, { id: "quotation", label: "Quotation", color: "#508d4c" }, { id: "negotiation", label: "Negotiation", color: "#3a7745" }, { id: "won", label: "Won", color: "#245e31" }, { id: "lost", label: "Lost", color: "#a87969" },
 ] as const;
 
 export function Dashboard({ name = "Rami", role = "sales_manager", data, nowIso }: { name?: string; role?: string; data: DashboardData; nowIso: string }) {
-  const metrics = getDashboardMetrics(data.leads, data.tasks, nowIso);
+  const metrics = getDashboardMetrics(data.leads, data.tasks, nowIso, { siteVisits: data.siteVisitCount, quotations: data.quotationCount });
   const kpis = [
     { label: "New leads", value: metrics.newLeads, icon: UserPlus, href: "/leads?status=new" },
     { label: "Leads today", value: metrics.leadsToday, icon: Target, href: "/leads?received=today" },

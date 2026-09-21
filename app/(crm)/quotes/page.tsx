@@ -1,19 +1,8 @@
-import { FutureModule } from "@/components/future-module";
-import { LeadsTable } from "@/components/leads/leads-table";
-import { getLeads, getProfiles } from "@/lib/data";
+import Link from "next/link";
+import { FileText, Plus } from "lucide-react";
+import { Badge, Card, EmptyState, LinkButton, PageIntro, selectClass } from "@/components/ui/primitives";
+import { getQuotations } from "@/lib/phase2-data";
+import type { QuotationStatus } from "@/lib/types";
 
-export default async function QuotesPage() {
-  const [leads, profiles] = await Promise.all([getLeads(), getProfiles()]);
-  return (
-    <div className="space-y-6">
-      <FutureModule name="Quotes" description="Create, review and track commercial quotations from qualified leads." capabilities={["Quote templates", "Service line items", "Version history", "Approval workflow", "PDF generation", "Customer acceptance"]} />
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[#29352c]">Leads at quotation</h2>
-          <p className="mt-1 text-[11px] text-[#89918a]">Live Supabase records currently in the Quotation pipeline stage.</p>
-        </div>
-        <LeadsTable leads={leads} profiles={profiles} nowIso={new Date().toISOString()} fixedStatus="quotation" emptyTitle="No quotation leads found." />
-      </section>
-    </div>
-  );
-}
+const statuses: QuotationStatus[] = ["draft", "pending_approval", "approved", "sent", "accepted", "rejected", "expired"];
+export default async function QuotesPage({ searchParams }: PageProps<"/quotes">) { const params = await searchParams; const status = typeof params.status === "string" && statuses.includes(params.status as QuotationStatus) ? params.status as QuotationStatus : undefined; const quotes = (await getQuotations()).filter((quote) => !status || quote.status === status); return <div className="space-y-6"><PageIntro title="Quotations" description="Create, approve, send and preserve every commercial revision." actions={<LinkButton href="/quotes/new"><Plus className="size-4" /> New quotation</LinkButton>} /><Card><div className="flex flex-col gap-3 border-b border-[#edf0ed] p-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-[#7b857d]">{quotes.length} {quotes.length === 1 ? "quotation" : "quotations"}</p><form className="flex gap-2"><select name="status" defaultValue={status ?? ""} className={`${selectClass} h-9 min-w-44 text-xs`}><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select><button className="h-9 rounded-lg border border-[#dce3dc] px-3 text-xs font-semibold text-[#59635c]">Filter</button></form></div>{quotes.length ? <div className="divide-y divide-[#edf0ed]">{quotes.map((quote) => <Link key={quote.id} href={`/quotes/${quote.id}`} className="flex flex-col gap-3 p-4 hover:bg-[#fafbfa] sm:flex-row sm:items-center sm:px-5"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#edf4ed] text-[#448349]"><FileText className="size-5" /></span><span className="min-w-0 flex-1"><span className="block text-sm font-semibold text-[#2d3930]">{quote.quote_number} · {quote.project_name}</span><span className="mt-1 block text-[10px] text-[#818b83]">{quote.contact_name} · Version {quote.current_version} · {quote.salesperson_name}</span></span><span className="flex items-center justify-between gap-4 sm:block sm:text-right"><Badge value={quote.status} /><span className="text-xs font-semibold text-[#39463c] sm:mt-2 sm:block">{quote.currency} {Number(quote.total).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span></span></Link>)}</div> : <EmptyState icon={<FileText className="size-5" />} title={status ? `No ${status.replaceAll("_", " ")} quotations found.` : "No quotations yet."} description="Create a quotation from a lead or completed site visit." action={<LinkButton href="/quotes/new">New quotation</LinkButton>} />}</Card></div>; }

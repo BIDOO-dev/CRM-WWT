@@ -1,19 +1,14 @@
-import { FutureModule } from "@/components/future-module";
-import { LeadsTable } from "@/components/leads/leads-table";
-import { getLeads, getProfiles } from "@/lib/data";
+import Link from "next/link";
+import { CalendarCheck2, MapPin, Plus } from "lucide-react";
+import { Badge, Card, EmptyState, LinkButton, PageIntro, selectClass } from "@/components/ui/primitives";
+import { getSiteVisits } from "@/lib/phase2-data";
+import type { SiteVisitStatus } from "@/lib/types";
 
-export default async function SiteVisitsPage() {
-  const [leads, profiles] = await Promise.all([getLeads(), getProfiles()]);
-  return (
-    <div className="space-y-6">
-      <FutureModule name="Site Visits" description="Structured assessment visits connected to contacts and leads." capabilities={["Mobile visit forms", "Photos and evidence", "Waste-stream observations", "Customer sign-off", "Follow-up actions", "Operational handoff"]} />
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-sm font-semibold text-[#29352c]">Leads at site visit</h2>
-          <p className="mt-1 text-[11px] text-[#89918a]">Live Supabase records currently in the Site Visit pipeline stage.</p>
-        </div>
-        <LeadsTable leads={leads} profiles={profiles} nowIso={new Date().toISOString()} fixedStatus="site_visit" emptyTitle="No site visit leads found." />
-      </section>
-    </div>
-  );
+const statuses: SiteVisitStatus[] = ["scheduled", "completed", "cancelled", "rescheduled"];
+
+export default async function SiteVisitsPage({ searchParams }: PageProps<"/site-visits">) {
+  const params = await searchParams;
+  const status = typeof params.status === "string" && statuses.includes(params.status as SiteVisitStatus) ? params.status as SiteVisitStatus : undefined;
+  const visits = (await getSiteVisits()).filter((visit) => !status || visit.status === status);
+  return <div className="space-y-6"><PageIntro title="Site visits" description="Schedule assessments, record field observations and move qualified opportunities toward quotation." actions={<LinkButton href="/site-visits/new"><Plus className="size-4" /> Schedule visit</LinkButton>} /><Card><div className="flex flex-col gap-3 border-b border-[#edf0ed] p-4 sm:flex-row sm:items-center sm:justify-between"><p className="text-xs text-[#7b857d]">{visits.length} {visits.length === 1 ? "visit" : "visits"}</p><form className="flex gap-2"><select name="status" defaultValue={status ?? ""} className={`${selectClass} h-9 min-w-44 text-xs`}><option value="">All statuses</option>{statuses.map((value) => <option key={value} value={value}>{value.replaceAll("_", " ")}</option>)}</select><button className="h-9 rounded-lg border border-[#dce3dc] px-3 text-xs font-semibold text-[#59635c]">Filter</button></form></div>{visits.length ? <div className="divide-y divide-[#edf0ed]">{visits.map((visit) => <Link key={visit.id} href={`/site-visits/${visit.id}`} className="flex flex-col gap-3 p-4 hover:bg-[#fafbfa] sm:flex-row sm:items-center sm:px-5"><span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#edf4ed] text-[#448349]"><CalendarCheck2 className="size-5" /></span><span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold text-[#2d3930]">{visit.project_name}</span><span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[#818b83]"><span>{visit.contact_name}</span><span className="inline-flex items-center gap-1"><MapPin className="size-3" /> {visit.site_location}</span><span>{new Date(visit.scheduled_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" })}</span></span></span><span className="flex items-center justify-between gap-3 sm:block sm:text-right"><Badge value={visit.status} /><span className="text-[9px] text-[#8b948c] sm:mt-2 sm:block">{visit.assigned_name}</span></span></Link>)}</div> : <EmptyState icon={<CalendarCheck2 className="size-5" />} title={status ? `No ${status.replaceAll("_", " ")} site visits found.` : "No site visits yet."} description="Schedule a visit from a qualified lead to start the field assessment workflow." action={<LinkButton href="/site-visits/new">Schedule visit</LinkButton>} />}</Card></div>;
 }

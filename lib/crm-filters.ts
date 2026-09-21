@@ -58,14 +58,14 @@ export function filterTasks(tasks: CrmTask[], filters: TaskFilters, nowIso: stri
   });
 }
 
-export function getDashboardMetrics(leads: Lead[], tasks: CrmTask[], nowIso: string) {
+export function getDashboardMetrics(leads: Lead[], tasks: CrmTask[], nowIso: string, operational?: { siteVisits: number; quotations: number }) {
   const leadCount = (status: LeadStatus) => filterLeads(leads, { status }, nowIso).length;
   return {
     newLeads: leadCount("new"),
     leadsToday: filterLeads(leads, { received: "today" }, nowIso).length,
     qualifiedLeads: leadCount("qualified"),
-    siteVisits: leadCount("site_visit"),
-    quotations: leadCount("quotation"),
+    siteVisits: operational?.siteVisits ?? leadCount("site_visit"),
+    quotations: operational?.quotations ?? leadCount("quotation"),
     wonLeads: leadCount("won"),
     lostLeads: leadCount("lost"),
     tasksDueToday: filterTasks(tasks, { due: "today" }, nowIso).length,

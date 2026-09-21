@@ -1,8 +1,8 @@
-# WWT CRM — Phase 1
+# WWT CRM — Phase 2
 
-WWT CRM is an internal, responsive sales workspace for Waste Water Treatment / Recyco. It is organized around WWT's inbound workflow: one contact record per person, multiple leads per contact, follow-ups and a permanent customer timeline.
+WWT CRM is an internal, responsive sales workspace for Waste Water Treatment / Recyco. It is organized around WWT's operating model: one contact identity can have multiple independent leads, and every opportunity retains its follow-ups, field work, commercial documents and activity history.
 
-## Phase 1 scope
+## Current scope
 
 - Supabase email/password authentication with login, logout, reset flow, server-side session refresh and protected routes
 - Role model for `admin`, `sales_manager` and `sales_rep`
@@ -14,7 +14,12 @@ WWT CRM is an internal, responsive sales workspace for Waste Water Treatment / R
 - Contact detail with multiple independent leads, tasks and activity history
 - Mobile-friendly contact calling, email and official WhatsApp deep links (no WhatsApp automation)
 - Task views, creation and quick completion with audit entries
-- Clearly marked Phase 2 surfaces for site visits, quotes, tenders and reports
+- Structured site visits with field observations, recommendations, linked files and a one-click quotation handoff
+- Versioned quotations with line-item calculations, explicit tax settings, approval/status tracking and branded private PDFs
+- Tender tracking with deadlines, bid states, editable checklists and private supporting files
+- Live operational reporting for lead sources, receiving numbers, stages, visits, quotes, tenders and salesperson performance
+- Protected team administration and a dry-run-first historical Excel importer
+- Expanded global search across contacts, phones, email, projects, quote numbers and tender references
 
 The application uses Supabase by default in every environment. Development preview data is available only when `NEXT_PUBLIC_WWT_DEMO_MODE=true` is set explicitly.
 
@@ -25,7 +30,7 @@ Requirements: Node.js 20.19+ (or 22.12+) and a Supabase project. Docker is also 
 1. Install dependencies with `npm install`.
 2. Copy `.env.example` to `.env.local`.
 3. Add the Supabase project URL and publishable key.
-4. Apply all migrations in `supabase/migrations` in timestamp order. Existing installations must apply `20260907170000_contact_lead_first_crm.sql` after the Phase 1 migration.
+4. Apply all migrations in `supabase/migrations` in timestamp order. Existing installations should use `supabase db push` so the linked project receives only unapplied versioned migrations.
 5. Run `npm run dev`.
 
 For a local Supabase environment, install the Supabase CLI and run `supabase start`, then `supabase db reset`. The reset applies the migration and loads `supabase/seed.sql`.
@@ -68,15 +73,30 @@ Future user and team administration belongs in the protected Settings area. Do n
 ## Data and authorization design
 
 - Auth identities live in `auth.users`; application attributes live in `public.profiles`.
-- `manager_id` provides a minimal team hierarchy without introducing a premature team-management module.
+- `manager_id` provides the team hierarchy used by assignment scope and reporting.
 - Contacts are the customer identity. Phone and WhatsApp values receive indexed normalized keys so future webhooks can reuse an existing person.
 - Every customer request is a lead. One contact can have any number of leads, each with its own need, stage, assignee, source and follow-up.
 - Leads preserve the original message, source, receiving WWT WhatsApp number and campaign source for future Meta WhatsApp Business Platform ingestion.
 - Lead stages are `New`, `Contacted`, `Qualified`, `Site Visit`, `Quotation`, `Negotiation`, `Won` and `Lost`.
 - The contact/lead creation database function performs phone matching and both writes in one transaction.
 - Historical company and opportunity tables are retained as an archive by the migration, but active application workflows neither create nor require them.
+- Site visits remain linked to both the originating lead and contact.
+- Quotations keep immutable previous versions after a sent/accepted/rejected/expired offer is revised. Totals are recalculated in PostgreSQL as well as previewed in the UI.
+- Tenders retain editable checklist rows and deadline/status history.
 - Important changes are audited through database triggers, not only UI code.
 - Summary views use `security_invoker = true`, preserving underlying RLS.
+- The `crm-files` Storage bucket is private. Downloads use short-lived signed URLs and object policies use the same record scope as the database.
+
+## Historical lead import
+
+The importer is available to administrators and sales managers under **Settings → Master lead import**.
+
+1. Upload an `.xlsx` workbook to the preview screen. The file is parsed in memory and is not committed to the repository.
+2. Review per-sheet column mappings, historical owner mappings, status/color mappings, validation warnings, duplicate estimates and existing-contact matches.
+3. Run preview again after mapping changes.
+4. Type the explicit confirmation only when the summary is correct. The server verifies the workbook fingerprint and performs the import in one database transaction.
+
+Contacts are matched primarily by normalized phone or WhatsApp number. Invalid/missing-phone rows remain in manual review and are not imported automatically. The source workbook must never be committed, copied into fixtures, or represented with real customer details in tests or documentation.
 
 ## Quality checks
 
@@ -87,22 +107,15 @@ npm test
 npm run build
 ```
 
-The current unit suite covers role capability helpers, all lead stages, contact/lead/task validation, phone-ready schema architecture, migration safety and removal of the old routes. Database policy integration should also be exercised against an isolated Supabase branch before production rollout.
+The test suite covers role capabilities, Phase 1 and Phase 2 validation, quotation calculations, phone import normalization, contact/lead matching safeguards, versioning, storage/RLS migration requirements and route preservation. Run database policy integration against an isolated Supabase branch before promoting migrations to production.
 
-## Phase 2
+## Explicitly out of scope
 
-- Structured site-visit and waste-audit forms, photo/document uploads and operational handoff
-- Quotation templates, approval/versioning and PDF generation
-- Tender deadlines, document checklists and bid/no-bid workflow
-- Reporting, sales forecasting and environmental impact dashboards
-- Admin-managed employee invitations and sales teams
-- Notification delivery and saved search/filter preferences
+WhatsApp Business Platform webhooks, inbound-message automation, AI replies, OpenAI processing and AI lead classification remain Phase 3.
 
-WhatsApp Business Platform webhooks, inbound-message matching, automated lead creation and approved responses remain Phase 3.
+## Operational notes
 
-## Known limitations
-
-- Phase 1 has no in-app user administration; the first admin is bootstrapped in Supabase.
-- Pipeline stages are not yet editable by administrators.
-- The development preview acknowledges mutations without persisting them. Persistent workflow verification requires Supabase.
-- RLS policies are included and unit-tested capability rules are covered, but a production Supabase branch is still required for full end-to-end RLS regression testing.
+- The first administrator is still bootstrapped in Supabase Auth; existing admins can configure application profile fields in Settings.
+- Changing an employee email in Settings changes the CRM directory only. Login-email changes remain a protected Supabase Auth administration operation.
+- Demo mode is development-only and must stay disabled in production.
+- Customer workbooks and generated local previews are intentionally ignored by Git.

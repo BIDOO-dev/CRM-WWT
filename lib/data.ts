@@ -59,13 +59,21 @@ export async function getTasks(): Promise<CrmTask[]> {
 
 export async function getDashboardData() {
   const [leads, tasks] = await Promise.all([getLeads(), getTasks()]);
+  let siteVisitCount = leads.filter((lead) => lead.status === "site_visit").length;
+  let quotationCount = leads.filter((lead) => lead.status === "quotation").length;
   let activities = demoActivities;
   if (!isDemoMode()) {
     const supabase = await createSupabaseServerClient();
-    const { data } = await supabase.from("activities").select("id, activity_type, subject, description, occurred_at, profiles(full_name)").order("occurred_at", { ascending: false }).limit(8);
-    activities = (data ?? []).map((row: Record<string, unknown>) => ({ id: String(row.id), activity_type: String(row.activity_type), subject: String(row.subject), description: String(row.description ?? ""), occurred_at: String(row.occurred_at), user_name: (row.profiles as { full_name?: string } | null)?.full_name ?? "WWT CRM" }));
+    const [activityResult, visits, quotes] = await Promise.all([
+      supabase.from("activities").select("id, activity_type, subject, description, occurred_at, profiles(full_name)").order("occurred_at", { ascending: false }).limit(8),
+      supabase.from("site_visits").select("id", { count: "exact", head: true }),
+      supabase.from("quotations").select("id", { count: "exact", head: true }),
+    ]);
+    activities = (activityResult.data ?? []).map((row: Record<string, unknown>) => ({ id: String(row.id), activity_type: String(row.activity_type), subject: String(row.subject), description: String(row.description ?? ""), occurred_at: String(row.occurred_at), user_name: (row.profiles as { full_name?: string } | null)?.full_name ?? "WWT CRM" }));
+    siteVisitCount = visits.count ?? 0;
+    quotationCount = quotes.count ?? 0;
   }
-  return { leads, tasks, activities };
+  return { leads, tasks, activities, siteVisitCount, quotationCount };
 }
 
 export async function getActivitiesFor(subject: "contact" | "lead", id: string) {

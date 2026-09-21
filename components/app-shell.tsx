@@ -21,7 +21,7 @@ const primaryNav = [
   { label: "Tasks", href: "/tasks", icon: ClipboardCheck },
 ];
 
-const futureNav = [
+const operationalNav = [
   { label: "Site Visits", href: "/site-visits", icon: CalendarCheck2 },
   { label: "Quotes", href: "/quotes", icon: FileText },
   { label: "Tenders", href: "/tenders", icon: UsersRound },
@@ -58,10 +58,10 @@ function NavContent({ profile, onNavigate }: { profile: Profile; onNavigate?: ()
             </Link>
           );
         })}
-        <div className="px-3 pb-1 pt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9ba39c]">Workspace / Future modules</div>
-        {futureNav.map((item) => { const Icon = item.icon; return (
-          <Link key={item.label} href={item.href} onClick={onNavigate} className="group flex min-h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium text-[#59635c] transition-colors hover:bg-[#f1f4f1] hover:text-[#233026]">
-            <Icon className="size-[18px] text-[#889188] group-hover:text-[#508d4c]" strokeWidth={1.8} /><span className="flex-1">{item.label}</span><span className="rounded-full border border-[#dfe5df] px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-wider text-[#969e97]">Soon</span>
+        <div className="px-3 pb-1 pt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-[#9ba39c]">Operations</div>
+        {operationalNav.map((item) => { const Icon = item.icon; const active = pathname.startsWith(item.href); return (
+          <Link key={item.label} href={item.href} onClick={onNavigate} className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${active ? "bg-[#e9f2e9] text-[#315f38]" : "text-[#59635c] hover:bg-[#f1f4f1] hover:text-[#233026]"}`}>
+            <Icon className={`size-[18px] ${active ? "text-[#448349]" : "text-[#889188] group-hover:text-[#508d4c]"}`} strokeWidth={1.8} /><span className="flex-1">{item.label}</span>
           </Link>
         );})}
       </nav>
@@ -83,7 +83,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   "/pipeline": { title: "Pipeline", subtitle: "Move leads through the WWT sales process" },
   "/contacts": { title: "Contacts", subtitle: "People and their complete WWT history" },
   "/tasks": { title: "Tasks", subtitle: "Follow-ups and next actions" },
-  "/site-visits": { title: "Site Visits" }, "/quotes": { title: "Quotes" }, "/tenders": { title: "Tenders" }, "/reports": { title: "Reports" }, "/settings": { title: "Settings" },
+  "/site-visits": { title: "Site Visits", subtitle: "Field assessments and recommendations" }, "/quotes": { title: "Quotes", subtitle: "Versioned commercial quotations" }, "/tenders": { title: "Tenders", subtitle: "Bid deadlines, documents and decisions" }, "/reports": { title: "Reports", subtitle: "Live operational and conversion reporting" }, "/settings": { title: "Settings" },
 };
 
 export function AppShell({ profile, children }: { profile: Profile; children: React.ReactNode }) {

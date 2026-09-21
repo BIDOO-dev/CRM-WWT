@@ -76,6 +76,21 @@ export async function updateLeadStatusAction(id: string, status: LeadStatus): Pr
   }
 }
 
+export async function reassignLeadAction(id: string, assignedTo: string): Promise<ActionResult> {
+  const profile = await requireProfile();
+  if (!canManageAssignments(profile.role)) return { ok: false, kind: "permission_denied", message: "Only administrators and sales managers can reassign leads." };
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assignedTo)) return validationFailure("Choose a valid salesperson.");
+  if (isDemoMode()) return { ok: true, message: "Lead reassigned in preview mode." };
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.from("leads").update({ assigned_to: assignedTo }).eq("id", id).select("id").maybeSingle();
+    if (error) return actionFailure("lead.reassign", profile.id, error, { permission_denied: "That salesperson is outside your permitted team scope." });
+    if (!data) return notFoundFailure("lead.reassign", profile.id);
+    revalidatePath("/leads"); revalidatePath(`/leads/${id}`); revalidatePath("/pipeline"); revalidatePath("/dashboard");
+    return { ok: true, message: "Lead reassigned." };
+  } catch (error) { return actionFailure("lead.reassign", profile.id, error); }
+}
+
 export async function updateLeadNeedAction(id: string, input: unknown): Promise<ActionResult> {
   const profile = await requireProfile();
   const parsed = leadNeedSchema.safeParse(input);
