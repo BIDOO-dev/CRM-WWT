@@ -1,4 +1,4 @@
-# WWT CRM — Phase 2
+# WWT CRM — Phase 3A
 
 WWT CRM is an internal, responsive sales workspace for Waste Water Treatment / Recyco. It is organized around WWT's operating model: one contact identity can have multiple independent leads, and every opportunity retains its follow-ups, field work, commercial documents and activity history.
 
@@ -12,7 +12,8 @@ WWT CRM is an internal, responsive sales workspace for Waste Water Treatment / R
 - Lead detail, manual customer-need editing, activity notes and full pipeline stage changes
 - Drag-and-drop lead pipeline with failed-write rollback and list view
 - Contact detail with multiple independent leads, tasks and activity history
-- Mobile-friendly contact calling, email and official WhatsApp deep links (no WhatsApp automation)
+- Mobile-friendly contact calling, email and official WhatsApp deep links
+- Unified Inbox with WhatsApp Cloud API messaging, CRM matching, assignment, internal notes and optional AI assistance
 - Task views, creation and quick completion with audit entries
 - Structured site visits with field observations, recommendations, linked files and a one-click quotation handoff
 - Versioned quotations with line-item calculations, explicit tax settings, approval/status tracking and branded private PDFs
@@ -44,7 +45,7 @@ For a local Supabase environment, install the Supabase CLI and run `supabase sta
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Legacy alternative | Supported for older Supabase projects |
 | `NEXT_PUBLIC_WWT_DEMO_MODE` | No (must remain `false` for live data) | Explicitly enables preview data only when set to `true`; never enable for deployment |
 
-There is deliberately no service-role key in this application. Browser and server requests both run as the signed-in user and are constrained by PostgreSQL RLS.
+Every browser and server request made by an employee runs as that signed-in user and is constrained by PostgreSQL RLS. The single exception is the channel webhook (`/api/webhooks/meta`): it has no user session, so after verifying Meta's signature it stores inbound messages with the server-only `SUPABASE_SERVICE_ROLE_KEY`. That key is read in `lib/supabase/admin.ts` only and must never be given a `NEXT_PUBLIC_` name. See [Unified inbox](#unified-inbox) for the inbox variables.
 
 ## Creating the first administrator
 
@@ -109,9 +110,58 @@ npm run build
 
 The test suite covers role capabilities, Phase 1 and Phase 2 validation, quotation calculations, phone import normalization, contact/lead matching safeguards, versioning, storage/RLS migration requirements and route preservation. Run database policy integration against an isolated Supabase branch before promoting migrations to production.
 
+## Unified inbox
+
+The Inbox (`/inbox`) stores every customer conversation in Supabase and links it to the existing contact and lead records. WhatsApp (Meta Cloud API) is the first live channel; Instagram and Messenger adapters use the same interface and stay disabled until Meta App Review is complete. TikTok is listed as a disabled channel only, because there is no generally available direct-message API.
+
+How a message flows:
+
+1. Meta calls `POST /api/webhooks/meta`. The raw body is checked against `X-Hub-Signature-256` before anything is parsed or stored.
+2. `ingest_channel_message` (service role only) de-duplicates on the provider message id, finds or creates the conversation, matches the sender to a contact by channel identity, normalized phone or email, attaches the contact's open lead, and assigns the owner (lead owner, then contact owner, then the number's default salesperson, otherwise the unassigned queue).
+3. The message updates the conversation preview, the contact's last interaction and the lead's last contact, and writes one timeline entry per conversation session.
+4. Employees reply from the Inbox. The reply is stored as `queued`, sent through the channel adapter with server-side credentials, then marked `sent` or `failed`; Meta's delivery and read receipts update it afterwards.
+
+Rules worth knowing:
+
+- Unknown senders are never turned into contacts or leads automatically unless an administrator enables **Create leads automatically** for that number in Settings. Otherwise an employee uses **Convert to lead** or **Link existing contact**.
+- Sales representatives see conversations assigned to them or linked to a contact or lead they can already see. The unassigned queue is visible to sales managers and administrators, who are the only roles that can assign or reassign.
+- Free-form replies are only possible within 24 hours of the customer's last message (a Meta rule). Template messages for re-opening a conversation are not implemented yet.
+- Media is copied into the private `inbox-media` bucket and served through short-lived signed URLs.
+- AI assistance (summaries, reply drafts, requirement extraction, qualification, next actions) is optional and enabled by `ANTHROPIC_API_KEY`. Drafts are placed in the composer; nothing is sent without an employee pressing Send.
+
+### Inbox environment variables (all server-only)
+
+| Variable | Required for | Purpose |
+| --- | --- | --- |
+| `SUPABASE_SERVICE_ROLE_KEY` | Any channel | Lets the verified webhook store inbound messages |
+| `META_APP_SECRET` | Any Meta channel | Verifies webhook signatures |
+| `META_WEBHOOK_VERIFY_TOKEN` | Any Meta channel | Random string you choose; also entered in Meta's webhook setup |
+| `WHATSAPP_ACCESS_TOKEN` | WhatsApp | Permanent System User token used to send messages and download media |
+| `WHATSAPP_BUSINESS_ACCOUNT_ID` | WhatsApp (recommended) | Lets Settings list and register your numbers |
+| `META_GRAPH_API_VERSION` | Optional | Defaults to `v23.0` |
+| `MESSENGER_PAGE_ACCESS_TOKEN` | Messenger | Page token with `pages_messaging` |
+| `INSTAGRAM_ACCESS_TOKEN`, `INSTAGRAM_APP_SECRET`, `INSTAGRAM_GRAPH_HOST` | Instagram | Token with `instagram_manage_messages`; host is `graph.instagram.com` for Instagram Login |
+| `ANTHROPIC_API_KEY`, `INBOX_AI_MODEL` | Optional AI | Enables the AI assistant; model defaults to `claude-opus-5-5` |
+
+### Staging first
+
+Apply and test the Phase 3 migrations on a separate Supabase project before production:
+
+1. Create a new Supabase project (for example `wwt-crm-staging`). Do not copy production data into it; create a few fictional contacts and leads, or load `supabase/seed.sql`.
+2. `supabase link --project-ref <staging-ref>` then `supabase db push` to apply every migration in order.
+3. Create the first administrator as described above.
+4. Put the staging URL, publishable key and service-role key in `.env.local` (and in a Vercel **Preview** environment if you want Meta to reach it).
+5. Point a Meta **test** number's webhook at the staging URL and send a message.
+
+Only after that passes, run `supabase db push` against production and add the variables to the Vercel **Production** environment.
+
+### Database tests
+
+`tests/phase3-inbox-database.test.ts` runs every migration against an in-process Postgres (PGlite) with a minimal Supabase stand-in and checks matching, de-duplication, role visibility, assignment rules, status ordering and automatic lead creation. It is a fast safety net, not a replacement for testing on the staging project.
+
 ## Explicitly out of scope
 
-WhatsApp Business Platform webhooks, inbound-message automation, AI replies, OpenAI processing and AI lead classification remain Phase 3.
+WhatsApp template messages, WhatsApp history import for coexistence numbers, Messenger read receipts, TikTok messaging and any automatic sending of AI-written messages.
 
 ## Operational notes
 

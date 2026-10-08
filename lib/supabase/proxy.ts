@@ -4,6 +4,8 @@ import { hasSupabaseEnv } from "@/lib/config";
 
 export async function updateSession(request: NextRequest) {
   if (!hasSupabaseEnv()) return NextResponse.next({ request });
+  // Channel webhooks carry no CRM session; each route authenticates the provider's signature itself.
+  if (request.nextUrl.pathname.startsWith("/api/webhooks/")) return NextResponse.next({ request });
 
   let response = NextResponse.next({ request });
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Bell, CalendarCheck2, ClipboardCheck, ContactRound,
-  FileText, Gauge, KanbanSquare, Leaf, LogOut, Menu, Settings, Target,
+  FileText, Gauge, Inbox, KanbanSquare, Leaf, LogOut, Menu, Settings, Target,
   TrendingUp, UsersRound, X,
 } from "lucide-react";
 import { useState } from "react";
@@ -15,6 +15,7 @@ import { initials, titleCase } from "@/lib/utils";
 
 const primaryNav = [
   { label: "Dashboard", href: "/dashboard", icon: Gauge },
+  { label: "Inbox", href: "/inbox", icon: Inbox },
   { label: "Leads", href: "/leads", icon: Target },
   { label: "Pipeline", href: "/pipeline", icon: KanbanSquare },
   { label: "Contacts", href: "/contacts", icon: ContactRound },
@@ -42,7 +43,7 @@ function WwtMark() {
   );
 }
 
-function NavContent({ profile, onNavigate }: { profile: Profile; onNavigate?: () => void }) {
+function NavContent({ profile, inboxUnread, onNavigate }: { profile: Profile; inboxUnread: number; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <>
@@ -55,6 +56,7 @@ function NavContent({ profile, onNavigate }: { profile: Profile; onNavigate?: ()
             <Link key={item.label} href={item.href} onClick={onNavigate} className={`group flex min-h-10 items-center gap-3 rounded-lg px-3 text-[13px] font-medium transition-colors ${active ? "bg-[#e9f2e9] text-[#315f38]" : "text-[#59635c] hover:bg-[#f1f4f1] hover:text-[#233026]"}`}>
               <Icon className={`size-[18px] ${active ? "text-[#448349]" : "text-[#889188] group-hover:text-[#508d4c]"}`} strokeWidth={1.8} />
               <span className="flex-1">{item.label}</span>
+              {item.href === "/inbox" && inboxUnread > 0 ? <span className="rounded-full bg-[#448349] px-1.5 py-0.5 text-[10px] font-bold leading-none text-white" aria-label={`${inboxUnread} unread conversations`}>{inboxUnread > 99 ? "99+" : inboxUnread}</span> : null}
             </Link>
           );
         })}
@@ -79,6 +81,7 @@ function NavContent({ profile, onNavigate }: { profile: Profile; onNavigate?: ()
 
 const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   "/dashboard": { title: "Dashboard", subtitle: "Your commercial overview" },
+  "/inbox": { title: "Inbox", subtitle: "Customer conversations across every channel" },
   "/leads": { title: "Leads", subtitle: "Every incoming customer request" },
   "/pipeline": { title: "Pipeline", subtitle: "Move leads through the WWT sales process" },
   "/contacts": { title: "Contacts", subtitle: "People and their complete WWT history" },
@@ -86,18 +89,18 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   "/site-visits": { title: "Site Visits", subtitle: "Field assessments and recommendations" }, "/quotes": { title: "Quotes", subtitle: "Versioned commercial quotations" }, "/tenders": { title: "Tenders", subtitle: "Bid deadlines, documents and decisions" }, "/reports": { title: "Reports", subtitle: "Live operational and conversion reporting" }, "/settings": { title: "Settings" },
 };
 
-export function AppShell({ profile, children }: { profile: Profile; children: React.ReactNode }) {
+export function AppShell({ profile, inboxUnread = 0, children }: { profile: Profile; inboxUnread?: number; children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
   const basePath = `/${pathname.split("/")[1]}`;
   const meta = pageMeta[basePath] ?? { title: "WWT CRM" };
   return (
     <div className="min-h-screen bg-[#f7f8f6]">
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-[#e4e9e4] bg-white lg:flex"><NavContent profile={profile} /></aside>
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[248px] flex-col border-r border-[#e4e9e4] bg-white lg:flex"><NavContent profile={profile} inboxUnread={inboxUnread} /></aside>
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="Close navigation" className="absolute inset-0 bg-[#172019]/35 backdrop-blur-[2px]" onClick={() => setMobileOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 flex w-[285px] flex-col bg-white shadow-2xl"><button type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation" className="absolute right-3 top-4 grid size-9 place-items-center rounded-lg text-[#667069] hover:bg-[#f1f4f1]"><X className="size-5" /></button><NavContent profile={profile} onNavigate={() => setMobileOpen(false)} /></aside>
+          <aside className="absolute inset-y-0 left-0 flex w-[285px] flex-col bg-white shadow-2xl"><button type="button" onClick={() => setMobileOpen(false)} aria-label="Close navigation" className="absolute right-3 top-4 grid size-9 place-items-center rounded-lg text-[#667069] hover:bg-[#f1f4f1]"><X className="size-5" /></button><NavContent profile={profile} inboxUnread={inboxUnread} onNavigate={() => setMobileOpen(false)} /></aside>
         </div>
       ) : null}
       <div className="lg:pl-[248px]">

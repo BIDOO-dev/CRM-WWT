@@ -1,7 +1,9 @@
 import { AppShell } from "@/components/app-shell";
 import { requireProfile } from "@/lib/auth";
+import { getUnreadConversationCount } from "@/lib/inbox/data";
 
 export default async function CrmLayout({ children }: { children: React.ReactNode }) {
   const profile = await requireProfile();
-  return <AppShell profile={profile}>{children}</AppShell>;
+  const inboxUnread = await getUnreadConversationCount();
+  return <AppShell profile={profile} inboxUnread={inboxUnread}>{children}</AppShell>;
 }
